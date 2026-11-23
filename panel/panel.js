@@ -80,9 +80,14 @@ async function refreshRouters() {
     const management = cell(row, '');
     const ip = item.assignedIP || item.tunnelIP;
     if (item.connection === 'connected' && item.status === 'valid' && /^10\.80\.0\.\d{1,3}$/.test(ip ?? '')) {
+      const remote = document.createElement('a'); remote.className = 'button';
+      remote.href = `/remote.html?client=${encodeURIComponent(item.id)}`; remote.target = '_blank'; remote.rel = 'noopener noreferrer';
+      remote.textContent = 'Gestionar cliente'; remote.title = 'Abrir un navegador remoto desde el servidor por la VPN.';
+      management.append(remote);
       const link = document.createElement('a'); link.className = 'button secondary';
       link.href = `https://${ip}/`; link.target = '_blank'; link.rel = 'noopener noreferrer';
-      link.textContent = 'Web HTTPS ↗'; link.title = 'Abrir la gestión del cliente. Tu ordenador necesita acceso a la red VPN.'; management.append(link);
+      link.textContent = 'Acceso directo ↗'; link.title = 'Tu ordenador necesita acceso a la red VPN.';
+      management.append(link); management.className = 'management-actions';
     } else management.textContent = '—';
     target.append(row);
   }

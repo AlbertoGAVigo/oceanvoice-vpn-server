@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OceanVoice · Gestión remota</title>
+  <link rel="stylesheet" href="/remote.css"><script src="/remote.js" type="module"></script>
+</head>
+<body>
+  <header>
+    <strong>OCEANVOICE</strong><span id="client">Gestión remota</span>
+    <form id="target"><label>Protocolo<select id="protocol"><option value="https">HTTPS</option><option value="http">HTTP</option></select></label>
+      <label>Puerto<input id="port" type="number" min="1" max="65535" value="443" required></label><button type="submit" id="reconnect" disabled>Conectar</button></form>
+    <button type="button" id="finish" disabled>Cerrar sesión</button>
+  </header>
+  <div class="status"><span id="status" role="status" aria-live="polite">Preparando navegador remoto…</span><span id="expiry"></span></div>
+  <main id="screen" aria-label="Navegador remoto del dispositivo"></main>
+  <footer>El navegador se ejecuta en el servidor por la VPN. Introduce las credenciales del dispositivo en su propia web. La sesión se elimina tras 10 minutos sin actividad o al cumplir una hora.</footer>
+</body>
+</html>

@@ -1,6 +1,9 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { createRemote } from './remote.mjs';
 import { createPKI, failure } from './pki.mjs';
 const pki = createPKI();
 import { createConnections } from './connections.mjs';
@@ -9,6 +12,8 @@ import { createSettings } from './settings.mjs';
 const settings = createSettings();
 import { createAccess } from './access.mjs';
 const access = createAccess(pki);
+const remote = createRemote(pki, connections);
+const novncRoot = fileURLToPath(new URL('./node_modules/@novnc/novnc/', import.meta.url));
 
 const username = process.env.PANEL_USERNAME ?? '';
 const password = process.env.PANEL_PASSWORD ?? '';
@@ -24,12 +29,15 @@ const assets = new Map([
   ['/', ['index.html', 'text/html; charset=utf-8']],
   ['/panel.js', ['panel.js', 'text/javascript; charset=utf-8']],
   ['/panel.css', ['panel.css', 'text/css; charset=utf-8']],
+  ['/remote.html', ['remote.html', 'text/html; charset=utf-8']],
+  ['/remote.js', ['remote.js', 'text/javascript; charset=utf-8']],
+  ['/remote.css', ['remote.css', 'text/css; charset=utf-8']],
 ].map(([route, [file, type]]) => [route, [readFileSync(new URL(file, import.meta.url)), type]]));
 
 const server = createServer(async (request, response) => {
   response.setHeader('Cache-Control', 'no-store');
   response.setHeader('X-Content-Type-Options', 'nosniff');
-  response.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'");
+  response.setHeader('Content-Security-Policy', "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; img-src 'self' data: blob:; base-uri 'none'; frame-ancestors 'none'");
   const send = (status, body, type = 'text/plain; charset=utf-8') => {
     response.writeHead(status, { 'Content-Type': type });
     response.end(request.method === 'HEAD' ? undefined : body);
@@ -53,7 +61,8 @@ const server = createServer(async (request, response) => {
           (request.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(request.headers['sec-fetch-site']))))
         throw failure(403, 'Solicitud no permitida.');
       let result;
-      if (route === '/api/settings' && request.method === 'GET') result = await settings.get();
+      if (route.startsWith('/api/remote/') && request.method === 'GET') result = await remote.handle(route, request.method, null, request, response);
+      else if (route === '/api/settings' && request.method === 'GET') result = await settings.get();
       else if (route === '/api/access' && request.method === 'GET') result = await access.get();
       else if (route === '/api/routers' && request.method === 'GET') {
         const rows = await pki.list();
@@ -68,7 +77,7 @@ const server = createServer(async (request, response) => {
         }) };
       }
       else if (route === '/api/certificates' && request.method === 'GET') result = await pki.list();
-      else if (['/api/certificates', '/api/settings', '/api/access'].includes(route) && request.method === 'POST') {
+      else if ((['/api/certificates', '/api/settings', '/api/access'].includes(route) || route.startsWith('/api/remote/')) && request.method === 'POST') {
         let body = '';
         for await (const chunk of request) {
           body += chunk;
@@ -76,7 +85,8 @@ const server = createServer(async (request, response) => {
         }
         let input;
         try { input = JSON.parse(body); } catch { throw failure(400, 'Formulario inválido.'); }
-        result = route === '/api/settings' ? await settings.save(input) : route === '/api/access' ? await access.save(input) : await pki.create(input);
+        result = route.startsWith('/api/remote/') ? await remote.handle(route, request.method, input, request, response)
+          : route === '/api/settings' ? await settings.save(input) : route === '/api/access' ? await access.save(input) : await pki.create(input);
       } else {
         const match = /^\/api\/certificates\/([a-zA-Z0-9_-]+)\/(profile|revoke)$/.exec(route);
         if (match?.[2] === 'profile' && request.method === 'GET') {
@@ -95,6 +105,13 @@ const server = createServer(async (request, response) => {
       response.setHeader('Allow', 'GET, HEAD');
       send(405, 'Método no permitido.'); return;
     }
+    if (route.startsWith('/novnc/')) {
+      const target = path.resolve(novncRoot, decodeURIComponent(route.slice('/novnc/'.length)));
+      if (!target.startsWith(novncRoot) || !target.endsWith('.js')) throw failure(404, 'Recurso no encontrado.');
+      try { send(200, readFileSync(target), 'text/javascript; charset=utf-8'); }
+      catch { throw failure(404, 'Recurso no encontrado.'); }
+      return;
+    }
   } catch (error) {
     console.error('Panel operation failed:', error.status ?? error.code ?? 'internal');
     send(error.status ?? 503, JSON.stringify({ error: error.status ? error.message : 'Operación PKI fallida. Comprueba el volumen, los logs y el inventario antes de reintentar.' }), 'application/json; charset=utf-8');
@@ -107,6 +124,7 @@ const server = createServer(async (request, response) => {
   }
   send(200, ...asset);
 });
+remote.attach(server, configured);
 
 server.listen(8080, '0.0.0.0', () => {
   console.log(configured ? 'OceanVoice panel ready on port 8080' : 'Set PANEL_USERNAME and PANEL_PASSWORD to enable the panel');

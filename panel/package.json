@@ -1,0 +1,10 @@
+{
+  "name": "oceanvoice-vpn-panel",
+  "version": "0.6.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@novnc/novnc": "1.7.0",
+    "ws": "8.23.0"
+  }
+}

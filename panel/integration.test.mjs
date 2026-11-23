@@ -59,6 +59,11 @@ try {
   assert.match(await download.text(), /^remote vpn\.example\.com 21194$/m);
   assert.match(await createPKI(state).profile(row.id), /^remote vpn\.example\.com 21194$/m);
   assert.equal((await fetch('http://127.0.0.1:8080/panel.js', { headers: auth })).status, 200);
+  assert.equal((await fetch('http://127.0.0.1:8080/remote.html', { headers: auth })).status, 200);
+  assert.equal((await fetch('http://127.0.0.1:8080/novnc/core/rfb.js', { headers: auth })).status, 200);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/remote/start', { method: 'POST', headers: auth, body: '{}' })).status, 403);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/remote/start', { method: 'POST', headers: saveHeaders, body: JSON.stringify({ clientId: '../ca' }) })).status, 404);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/remote/start', { method: 'POST', headers: saveHeaders, body: JSON.stringify({ clientId: row.id }) })).status, 409);
   assert.equal((await fetch('http://127.0.0.1:8080/api/access')).status, 401);
   assert.equal((await fetch('http://127.0.0.1:8080/api/access', { method: 'POST', headers: auth, body: '{}' })).status, 403);
   const peer = await pki.create({ name: 'Router pareja', site: 'Vigo' });

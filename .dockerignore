@@ -6,3 +6,5 @@
 *.crt
 pki
 secrets
+**/node_modules
+**/__pycache__

@@ -8,3 +8,4 @@ pki/
 secrets/
 __pycache__/
 *.pyc
+node_modules/

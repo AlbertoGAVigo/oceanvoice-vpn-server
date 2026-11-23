@@ -15,7 +15,7 @@ services:
       - openvpn-pki:/var/lib/openvpn
 
   panel:
-    image: oceanvoice/openvpn-panel:0.5.1
+    image: oceanvoice/openvpn-panel:0.6.0
     build: ./panel
     restart: unless-stopped
     environment:
@@ -23,12 +23,41 @@ services:
       PANEL_PASSWORD: "${PANEL_PASSWORD:-}"
       VPN_HOST: "${VPN_HOST:-vpn.oceanvoice.es}"
       VPN_PORT: "${OPENVPN_PORT:-1194}"
+      REMOTE_BROWSER_URL: "http://openvpn:8091"
     volumes:
       - openvpn-pki:/var/lib/openvpn
+      - browser-auth:/var/lib/oceanvoice-browser-auth
     ports:
       - "${PANEL_BIND_IP:-127.0.0.1}:${PANEL_HTTP_PORT:-8085}:8080"
       - "${PANEL_SECOND_BIND_IP:-127.0.0.2}:${PANEL_HTTP_PORT:-8085}:8080"
 
+  browser:
+    image: oceanvoice/openvpn-browser:0.1.0
+    build: ./browser
+    init: true
+    restart: unless-stopped
+    network_mode: "service:openvpn"
+    depends_on:
+      openvpn:
+        condition: service_started
+        restart: true
+    cap_add:
+      - NET_ADMIN
+    security_opt:
+      - seccomp:./browser/seccomp.json
+    shm_size: 256mb
+    mem_limit: 2g
+    pids_limit: 512
+    environment:
+      BROWSER_MAX_SESSIONS: "${BROWSER_MAX_SESSIONS:-4}"
+    volumes:
+      - browser-auth:/run/browser-auth:ro
+
 volumes:
   openvpn-pki:
     name: oceanvoice-openvpn-pki
+  browser-auth:
+    name: oceanvoice-openvpn-browser-auth
+    labels:
+      es.tempomar.dev.owner: claude-code
+      es.tempomar.dev.env: devalberto

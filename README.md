@@ -84,14 +84,52 @@ El menu ocupa la misma barra superior que OCEANVOICE / VPN ADMIN; en pantallas
 pequenas pasa a una segunda linea con desplazamiento horizontal. Las acciones
 Descargar .ovpn y Revocar aparecen como botones en la misma fila.
 
-En Monitorizacion, **Web HTTPS** abre `https://<IP_VPN>/` del cliente conectado
-en una pestana independiente. Es un enlace directo, no un proxy: el ordenador
-del usuario necesita ruta hacia la VPN y permisos de comunicacion, y el cliente
-debe permitir HTTPS en su IP VPN. No se activa acceso publico ni se cambian las
-reglas del dispositivo. Un iframe no evita esos requisitos y puede estar
-bloqueado por las cabeceras de seguridad de la web del equipo. Para acceder
-desde un navegador sin ruta a la VPN haria falta una pasarela autenticada,
-preferiblemente en un origen distinto al del panel de certificados.
+En Monitorizacion, **Gestionar cliente** abre una sesion de navegador remoto
+en el servidor. El ordenador del usuario no necesita VPN: teclado, raton y
+pantalla viajan por el panel y el navegador conecta con la IP VPN del equipo.
+**Acceso directo** sigue abriendo `https://<IP_VPN>/` desde el ordenador local,
+que si necesita ruta hacia la VPN y permisos de comunicacion.
+
+### Navegador remoto
+
+El servicio `browser` comparte exclusivamente la red del servicio OpenVPN.
+No publica puertos al host, no monta el socket Docker ni el volumen PKI.
+Un controlador autentica las solicitudes internas del panel mediante HMAC;
+la clave se conserva en el volumen separado `oceanvoice-openvpn-browser-auth`,
+montado como solo lectura en el controlador. No recibe la contrasena del panel.
+
+Cada sesion usa un usuario Linux, pantalla Xvfb, Chromium y perfil de cookies
+independientes. Chromium se ejecuta sin privilegios y con su sandbox habilitado;
+`browser/seccomp.json` es el perfil de Microsoft Playwright que permite crear
+los namespaces necesarios. Fuente: https://github.com/microsoft/playwright/blob/main/utils/docker/seccomp_profile.json
+El contenedor necesita NET_ADMIN para su tabla propia `inet oceanvoice_browser`:
+solo permite al usuario de cada sesion conectar con la IP elegida, en los puertos
+80, 443 y el puerto de gestion seleccionado. Bloquea acceso a otros clientes,
+la LAN, Internet y los servicios internos. No modifica la tabla de grupos VPN.
+
+La pantalla se transmite con noVNC a traves de WebSocket, autenticada mediante
+una cookie HttpOnly/SameSite y vinculada al navegador del administrador que la
+creo. Compartir la URL no comparte la sesion. El panel actual tiene una cuenta
+administradora configurada con HTTP Basic; no incorpora un directorio de usuarios.
+Se verifican certificado y conexion antes de abrir, reconectar y mientras se usa
+la sesion. Las sesiones se cierran tras 10 minutos sin teclado/raton, al cumplir
+una hora, al pulsar Cerrar sesion o al reiniciar el servicio. Los perfiles son
+temporales: no se conservan credenciales ni cookies entre sesiones.
+
+`BROWSER_MAX_SESSIONS` limita las sesiones simultaneas (4 por defecto, maximo 8).
+El contenedor tiene limite de 2 GiB, 256 MiB de memoria compartida y 512 procesos.
+En la ventana se puede elegir HTTP o HTTPS y el puerto de gestion. HTTPS conserva
+la validacion de certificados del navegador; no se ignoran errores TLS. El
+dispositivo debe permitir el acceso web desde la VPN y seguira pidiendo sus
+propias credenciales. El escritorio remoto no cambia el perfil OpenVPN ni la IP.
+Los selectores de archivos pertenecen al servidor; esta version no incluye
+transferencia de archivos entre el ordenador local y el navegador remoto.
+
+Para publicar el panel mediante un proxy HTTPS, este debe conservar Host y
+permitir Upgrade/Connection para `/remote-ws/`. noVNC se sirve localmente con
+version fijada en el package-lock. La nueva clave de broker debe incluirse en
+las copias de seguridad si se quiere conservar; regenerarla cierra la confianza
+de las sesiones existentes, sin afectar a la CA o a las conexiones VPN.
 
 El inventario muestra certificados de clientes vigentes, caducados y revocados.
 Su estado no indica si el router esta conectado. La revocacion publica una nueva
