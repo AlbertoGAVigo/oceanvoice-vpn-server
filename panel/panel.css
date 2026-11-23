@@ -21,8 +21,8 @@ section p { margin: 0; padding: 1.25rem; color: #aabbd1; }
 .content { padding: 1.25rem; }
 form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 label { display: grid; gap: .4rem; font-size: .875rem; color: #aabbd1; }
-input, button { font: inherit; border: 1px solid #496178; border-radius: .25rem; padding: .65rem; }
-input { width: 100%; background: #0c111b; color: #e4edf6; }
+input, button, select { font: inherit; border: 1px solid #496178; border-radius: .25rem; padding: .65rem; }
+input, select { width: 100%; background: #0c111b; color: #e4edf6; }
 button { cursor: pointer; background: #193e42; color: #a1f5e5; }
 button:hover { background: #245358; }
 button:disabled { opacity: .5; cursor: wait; }
@@ -68,6 +68,20 @@ li { margin: .8rem 0; }
 #settings .content { max-width: 58rem; }
 #settings .intro { padding: 0 0 1.5rem; }
 #settings-message { min-height: 3.5rem; padding: 1rem 0; }
+#access-message { min-height: 3.5rem; padding: 1rem 0; }
+#access-applied { color: #aabbd1; font-size: .75rem; }
+.group-fields { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.group-list { padding: 0; list-style: none; }
+.group-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 1rem; border: 1px solid #344358; border-radius: .25rem; }
+.group-list button { font-size: .75rem; }
+.group-list p { padding: .35rem 0 0; font-size: .8rem; }
+.group-actions { display: flex; gap: .5rem; }
+fieldset { border: 1px solid #344358; margin: 1rem 0; border-radius: .25rem; }
+legend { font-size: .8rem; color: #aabbd1; }
+.child-options { display: grid; gap: .5rem; }
+.child-options label { display: flex; align-items: center; gap: .6rem; }
+.child-options input { width: auto; }
+#settings .inline-help { padding: .75rem 0 0; font-size: .75rem; }
 .notice { padding: 1rem; border-left: 2px solid #698eaa; background: #0e1723; font-size: .8rem; }
 .notice p { padding: .5rem 0 0; }
 #connection-summary { padding: 0 0 1rem; font-size: .8rem; }
@@ -80,4 +94,6 @@ li { margin: .8rem 0; }
   .metrics strong { font-size: 1.5rem; }
   .tabs button { padding: .8rem; }
   .form-actions { flex-wrap: wrap; }
+  .group-fields { grid-template-columns: 1fr; }
+  .group-list li { align-items: start; flex-direction: column; }
 }

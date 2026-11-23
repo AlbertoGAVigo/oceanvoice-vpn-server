@@ -7,6 +7,8 @@ import { createConnections } from './connections.mjs';
 const connections = createConnections();
 import { createSettings } from './settings.mjs';
 const settings = createSettings();
+import { createAccess } from './access.mjs';
+const access = createAccess(pki);
 
 const username = process.env.PANEL_USERNAME ?? '';
 const password = process.env.PANEL_PASSWORD ?? '';
@@ -52,25 +54,29 @@ const server = createServer(async (request, response) => {
         throw failure(403, 'Solicitud no permitida.');
       let result;
       if (route === '/api/settings' && request.method === 'GET') result = await settings.get();
+      else if (route === '/api/access' && request.method === 'GET') result = await access.get();
       else if (route === '/api/routers' && request.method === 'GET') {
         const rows = await pki.list();
         const snapshot = await connections.sample();
+        let assignments = {};
+        try { assignments = JSON.parse(readFileSync(`${process.env.VPN_STATE ?? '/var/lib/openvpn'}/vpn-addresses.json`, 'utf8')); }
+        catch (error) { if (error.code !== 'ENOENT') throw error; }
         result = { available: snapshot.available, updatedAt: snapshot.updatedAt ?? null, routers: rows.map(row => {
           const live = snapshot.clients.find(client => client.id === row.id);
-          return { ...row, ...snapshot.history[row.id], ...live,
+          return { ...row, ...snapshot.history[row.id], ...live, assignedIP: assignments[row.id] ?? null,
             connection: !snapshot.available ? 'unknown' : live ? 'connected' : 'disconnected' };
         }) };
       }
       else if (route === '/api/certificates' && request.method === 'GET') result = await pki.list();
-      else if (['/api/certificates', '/api/settings'].includes(route) && request.method === 'POST') {
+      else if (['/api/certificates', '/api/settings', '/api/access'].includes(route) && request.method === 'POST') {
         let body = '';
         for await (const chunk of request) {
           body += chunk;
-          if (Buffer.byteLength(body) > 4096) throw failure(413, 'Formulario demasiado grande.');
+          if (Buffer.byteLength(body) > (route === '/api/access' ? 120000 : 4096)) throw failure(413, 'Formulario demasiado grande.');
         }
         let input;
         try { input = JSON.parse(body); } catch { throw failure(400, 'Formulario inválido.'); }
-        result = route === '/api/settings' ? await settings.save(input) : await pki.create(input);
+        result = route === '/api/settings' ? await settings.save(input) : route === '/api/access' ? await access.save(input) : await pki.create(input);
       } else {
         const match = /^\/api\/certificates\/([a-zA-Z0-9_-]+)\/(profile|revoke)$/.exec(route);
         if (match?.[2] === 'profile' && request.method === 'GET') {

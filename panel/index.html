@@ -27,9 +27,9 @@
       <h2 id="routers-title">Estado de los routers <span class="tag">EN DIRECTO</span></h2>
       <div class="content">
         <p id="connection-summary" role="status">Cargando conexiones…</p>
-        <div class="table-scroll"><table><thead><tr><th>Router / sede</th><th>Conexión</th><th>IP VPN actual / última</th><th>Origen público actual / último</th><th>Última conexión</th><th>Última vez visto</th></tr></thead><tbody id="routers"></tbody></table></div>
+        <div class="table-scroll"><table><thead><tr><th>Router / sede</th><th>Conexión</th><th>IP VPN fija</th><th>Origen público actual / último</th><th>Última conexión</th><th>Última vez visto</th></tr></thead><tbody id="routers"></tbody></table></div>
       </div>
-      <p>Actualización automática cada 10 segundos. Las IP pueden cambiar al reconectar. El historial empieza con esta versión; “Sin registro” significa que aún no se ha observado una conexión.</p>
+      <p>Actualización automática cada 10 segundos. Cada router conserva su IP VPN al reconectar y reiniciar. Las reservas se guardan de forma persistente y no se reutilizan.</p>
     </section>
     </div>
     <div id="clients" role="tabpanel" aria-labelledby="tab-clients" hidden>
@@ -62,6 +62,25 @@
         </form>
         <p id="settings-message" role="status" aria-live="polite"></p>
         <div class="notice"><strong>Se aplica a las próximas descargas</strong><p>Los perfiles .ovpn ya importados no cambian automáticamente. Después de guardar, vuelve a descargar e importar el perfil de cada router que lo necesite.</p><p>Este ajuste cambia el destino del perfil. El puerto publicado en Portainer y la redirección de puertos del router de Internet deben coincidir con ese destino; se administran por separado.</p></div>
+      </div>
+    </section>
+    <section aria-labelledby="access-title">
+      <h2 id="access-title">Comunicación entre dispositivos VPN</h2>
+      <div class="content">
+        <p class="intro">Decide qué dispositivos pueden comunicarse entre sí por su IP VPN fija. Estos permisos se aplican en el servidor y no requieren volver a descargar los perfiles.</p>
+        <form id="access-form">
+          <label class="full-width">Modo de acceso<select id="access-mode" name="mode" disabled><option value="isolated">Aislados: ningún dispositivo puede acceder a otro</option><option value="all">Todos entre sí: comunicación entre todos los dispositivos</option><option value="groups">Grupos: maestro e hijos</option></select></label>
+          <div id="group-editor" class="full-width" hidden>
+            <div class="group-fields"><label>Nombre del grupo<input id="group-name" maxlength="80" placeholder="Administración Vigo"></label><label>Dispositivo maestro<select id="group-master" aria-label="Dispositivo maestro"></select></label></div>
+            <fieldset><legend>Dispositivos hijos</legend><div id="group-children" class="child-options"></div></fieldset>
+            <button type="button" id="add-group">Añadir grupo</button>
+            <p class="inline-help">Maestro ↔ cada hijo: acceso en ambos sentidos. Los hijos no tienen acceso entre sí por pertenecer al grupo. Si un dispositivo está en varios grupos, se suman los permisos explícitos de esos grupos.</p>
+            <ul id="group-list" class="group-list"></ul>
+          </div>
+          <div class="form-actions"><button type="submit" id="save-access" disabled>Guardar permisos</button><span id="access-applied" role="status">Cargando estado de aplicación…</span></div>
+        </form>
+        <p id="access-message" role="status" aria-live="polite"></p>
+        <div class="notice"><strong>Alcance: dispositivos conectados a la VPN</strong><p>Las redes LAN detrás de los Teltonika necesitan rutas y reglas adicionales. Los servicios del equipo de destino también deben permitir el acceso. Los grupos solo incluyen dispositivos con certificado vigente.</p><p>El servidor impide el acceso directo entre hijos. Un maestro que actúe como proxy o router puede reenviar tráfico: administra también los permisos de ese equipo.</p></div>
       </div>
     </section>
     </div>

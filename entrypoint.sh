@@ -29,8 +29,8 @@ chmod 0711 "$state" "$EASYRSA_PKI"
 chmod 0644 "$EASYRSA_PKI/crl.pem"
 touch "$state/ipp.txt"
 chown nobody:nogroup "$state/ipp.txt"
-# Clear the previous process snapshot before accepting new sessions.
-: > "$state/status.tsv"
+# Preserve the previous snapshot until the supervisor migrates address reservations.
+touch "$state/status.tsv"
 chmod 0600 "$state/status.tsv"
 chown nobody:nogroup "$state/status.tsv"
-exec openvpn --config /etc/openvpn/server.conf
+exec python3 /usr/local/lib/oceanvoice/vpn_policy.py

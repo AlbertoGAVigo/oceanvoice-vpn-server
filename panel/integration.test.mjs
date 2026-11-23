@@ -59,5 +59,16 @@ try {
   assert.match(await download.text(), /^remote vpn\.example\.com 21194$/m);
   assert.match(await createPKI(state).profile(row.id), /^remote vpn\.example\.com 21194$/m);
   assert.equal((await fetch('http://127.0.0.1:8080/panel.js', { headers: auth })).status, 200);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/access')).status, 401);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/access', { method: 'POST', headers: auth, body: '{}' })).status, 403);
+  const peer = await pki.create({ name: 'Router pareja', site: 'Vigo' });
+  const badPair = await fetch('http://127.0.0.1:8080/api/access', { method: 'POST', headers: saveHeaders, body: JSON.stringify({ mode: 'groups', groups: [{ name: 'Bad', master: row.id, children: [row.id] }] }) });
+  assert.equal(badPair.status, 400);
+  const permitted = await fetch('http://127.0.0.1:8080/api/access', { method: 'POST', headers: saveHeaders, body: JSON.stringify({ mode: 'groups', groups: [{ name: 'Vigo', master: row.id, children: [peer.id, peer.id] }] }) });
+  assert.equal(permitted.status, 200);
+  assert.equal((await permitted.json()).groups[0].children.length, 1);
+  const access = await (await fetch('http://127.0.0.1:8080/api/access', { headers: auth })).json();
+  assert.equal(access.mode, 'groups'); assert.equal(access.healthy, false);
+  assert.equal(access.groups.length, 1);
 } finally { server.kill(); }
 console.log('PASS: certificate lifecycle, CRL, authentication, CSRF, endpoint validation/persistence and custom endpoint in HTTP .ovpn download.');

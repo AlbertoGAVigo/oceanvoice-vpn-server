@@ -6,3 +6,5 @@
 *.crt
 pki/
 secrets/
+__pycache__/
+*.pyc

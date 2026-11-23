@@ -43,7 +43,7 @@ async function perform(action) {
   if (busy) return;
   busy = true; document.querySelectorAll('#create-router button, #inventory button, #refresh').forEach(b => b.disabled = true);
   message.textContent = 'Procesando…';
-  try { await action(); await refresh(); }
+  try { await action(); await refresh(); if (!accessDirty) await refreshAccess(true); }
   catch (error) { message.textContent = error.message; }
   finally { busy = false; document.querySelectorAll('#create-router button, #inventory button, #refresh').forEach(b => b.disabled = false); }
 }
@@ -52,7 +52,7 @@ form.addEventListener('submit', event => {
   perform(async () => { await api('/api/certificates', Object.fromEntries(new FormData(form))); form.reset(); message.textContent = 'Certificado creado. Descarga el perfil .ovpn desde el inventario.'; });
 });
 document.querySelector('#refresh').addEventListener('click', () => perform(async () => { message.textContent = ''; }));
-refresh().catch(error => { message.textContent = error.message; document.querySelector('#count').textContent = 'Inventario no disponible'; });
+refresh().then(() => refreshAccess(true)).catch(error => { message.textContent = error.message; document.querySelector('#count').textContent = 'Inventario no disponible'; });
 function dateTime(value) { return value ? new Date(value).toLocaleString('es-ES') : 'Sin registro'; }
 async function refreshRouters() {
   const result = await api('/api/routers');
@@ -68,7 +68,7 @@ async function refreshRouters() {
     cell(row, `${item.name} / ${item.site || 'Sin sede'}`);
     const state = cell(row, { connected: 'Conectado', disconnected: 'Desconectado', unknown: 'Sin datos recientes' }[item.connection]);
     state.className = item.connection === 'connected' ? 'valid' : '';
-    cell(row, item.tunnelIP || (item.lastTunnelIP ? `${item.lastTunnelIP} (última)` : 'Sin asignar'));
+    cell(row, item.assignedIP || item.tunnelIP || item.lastTunnelIP || 'Reserva pendiente');
     cell(row, item.remoteAddress || (item.lastRemoteAddress ? `${item.lastRemoteAddress} (último)` : 'Sin registro'));
     cell(row, dateTime(item.connectedSince || item.lastConnected));
     cell(row, dateTime(item.lastSeen)); target.append(row);
@@ -76,7 +76,7 @@ async function refreshRouters() {
   if (!result.routers.length) { const row = document.createElement('tr'); const td = cell(row, 'Todavía no hay routers. Da de alta el primero en Certificados.'); td.colSpan = 6; target.append(row); }
 }
 setInterval(() => {
-  if (!busy) refreshRouters().catch(() => {
+  if (!busy) refreshRouters().then(() => refreshAccess(false)).catch(() => {
     document.querySelector('#connection-summary').textContent = 'No se pudo actualizar el estado. Los datos de la tabla pueden estar desactualizados.';
     document.querySelector('#metric-online').textContent = '—';
     document.querySelector('#metric-offline').textContent = '—';
@@ -131,4 +131,96 @@ endpointForm.addEventListener('submit', async event => {
     settingsMessage.textContent = 'Configuración guardada. Las próximas descargas .ovpn usarán este servidor y puerto.';
   } catch (error) { settingsMessage.textContent = error.message; }
   finally { saveSettings.disabled = false; endpointForm.querySelectorAll('input').forEach(input => input.readOnly = false); }
+});
+
+const accessForm = document.querySelector('#access-form');
+const accessMode = document.querySelector('#access-mode');
+const accessMessage = document.querySelector('#access-message');
+const saveAccess = document.querySelector('#save-access');
+let accessDirty = false;
+let accessRouters = [];
+let accessGroups = [];
+let accessSaving = false;
+function routerLabel(id) {
+  const router = accessRouters.find(row => row.id === id);
+  return router ? `${router.name} / ${router.site} · ${router.vpnIP || 'IP pendiente'}` : 'Dispositivo no vigente';
+}
+function renderChildren() {
+  const selected = new Set([...document.querySelectorAll('#group-children input:checked')].map(input => input.value));
+  const target = document.querySelector('#group-children'); target.replaceChildren();
+  const master = document.querySelector('#group-master').value;
+  for (const router of accessRouters.filter(row => row.id !== master)) {
+    const label = document.createElement('label'); const input = document.createElement('input');
+    input.type = 'checkbox'; input.value = router.id; input.checked = selected.has(router.id); input.disabled = accessSaving;
+    label.append(input, document.createTextNode(routerLabel(router.id))); target.append(label);
+  }
+  if (accessRouters.length < 2) target.textContent = 'Da de alta al menos dos dispositivos para crear un grupo.';
+}
+function renderGroups() {
+  document.querySelector('#group-editor').hidden = accessMode.value !== 'groups';
+  const list = document.querySelector('#group-list'); list.replaceChildren();
+  for (const [index, group] of accessGroups.entries()) {
+    const item = document.createElement('li'); const description = document.createElement('div');
+    const title = document.createElement('strong'); title.textContent = group.name;
+    const master = document.createElement('p'); master.textContent = `Maestro: ${routerLabel(group.master)}`;
+    const children = document.createElement('p'); children.textContent = `Hijos: ${group.children.map(routerLabel).join(' · ')}`;
+    description.append(title, master, children);
+    const edit = document.createElement('button'); edit.type = 'button'; edit.textContent = 'Editar'; edit.disabled = accessSaving;
+    edit.addEventListener('click', () => {
+      document.querySelector('#group-name').value = group.name;
+      document.querySelector('#group-master').value = group.master; renderChildren();
+      document.querySelectorAll('#group-children input').forEach(input => { input.checked = group.children.includes(input.value); });
+      accessGroups.splice(index, 1); accessDirty = true; renderGroups();
+      accessMessage.textContent = 'Edita el grupo y pulsa Añadir grupo antes de guardar los permisos.';
+    });
+    const remove = document.createElement('button'); remove.type = 'button'; remove.textContent = 'Quitar'; remove.disabled = accessSaving;
+    remove.addEventListener('click', () => { accessGroups.splice(index, 1); accessDirty = true; accessMessage.textContent = 'Cambios sin guardar.'; renderGroups(); });
+    const actions = document.createElement('div'); actions.className = 'group-actions'; actions.append(edit, remove);
+    item.append(description, actions); list.append(item);
+  }
+  if (!accessGroups.length) { const item = document.createElement('li'); item.textContent = 'Sin grupos: en este modo los dispositivos permanecen aislados.'; list.append(item); }
+  document.querySelector('#add-group').disabled = accessRouters.length < 2 || accessSaving;
+}
+async function refreshAccess(loadForm) {
+  const data = await api('/api/access');
+  const applied = document.querySelector('#access-applied');
+  applied.textContent = data.healthy ? `Aplicado en el servidor · ${dateTime(data.applied.checkedAt)}`
+    : data.applied?.error ? 'Error al aplicar. Revisa el servicio VPN en Portainer.' : 'Pendiente de confirmación del servidor';
+  applied.className = data.healthy ? 'valid' : '';
+  if (!loadForm || accessSaving) return;
+  accessRouters = data.routers.filter(router => router.status === 'valid');
+  accessGroups = data.groups.map(group => ({ ...group, children: group.children.filter(id => accessRouters.some(router => router.id === id)) }))
+    .filter(group => accessRouters.some(router => router.id === group.master) && group.children.length);
+  accessMode.value = data.mode;
+  const select = document.querySelector('#group-master'); select.replaceChildren();
+  for (const router of accessRouters) {
+    const option = document.createElement('option'); option.value = router.id; option.textContent = routerLabel(router.id); select.append(option);
+  }
+  accessDirty = false; accessMode.disabled = false; saveAccess.disabled = false; renderChildren(); renderGroups();
+}
+accessMode.addEventListener('change', () => { accessDirty = true; accessMessage.textContent = 'Cambios sin guardar.'; renderGroups(); });
+document.querySelector('#group-master').addEventListener('change', renderChildren);
+document.querySelector('#add-group').addEventListener('click', () => {
+  const name = document.querySelector('#group-name').value.trim();
+  const master = document.querySelector('#group-master').value;
+  const children = [...document.querySelectorAll('#group-children input:checked')].map(input => input.value);
+  if (!name || !master || !children.length) { accessMessage.textContent = 'Indica un nombre, un maestro y al menos un hijo.'; return; }
+  if (accessGroups.some(group => group.name.toLowerCase() === name.toLowerCase())) { accessMessage.textContent = 'Ya existe un grupo con ese nombre.'; return; }
+  accessGroups.push({ name, master, children }); accessDirty = true;
+  document.querySelector('#group-name').value = '';
+  document.querySelectorAll('#group-children input').forEach(input => { input.checked = false; });
+  accessMessage.textContent = 'Grupo añadido. Guarda los permisos para aplicarlo en el servidor.'; renderGroups();
+});
+accessForm.addEventListener('submit', async event => {
+  event.preventDefault(); if (accessSaving || saveAccess.disabled) return;
+  if (document.querySelector('#group-name').value.trim()) { accessMessage.textContent = 'Hay un grupo en edición. Pulsa Añadir grupo antes de guardar los permisos.'; return; }
+  if (!confirm('¿Aplicar estos permisos en el servidor VPN? En modo Grupos, cada maestro tendrá acceso bidireccional a sus hijos; no se autoriza acceso entre hijos.')) return;
+  accessSaving = true; saveAccess.disabled = true; accessMode.disabled = true; renderGroups(); renderChildren();
+  accessMessage.textContent = 'Guardando permisos…';
+  try {
+    await api('/api/access', { mode: accessMode.value, groups: accessGroups });
+    accessDirty = false; accessMessage.textContent = 'Permisos guardados. Esperando confirmación de aplicación en el servidor.';
+  } catch (error) { accessMessage.textContent = error.message; }
+  finally { accessSaving = false; accessMode.disabled = false; saveAccess.disabled = false; renderGroups(); renderChildren(); }
+  await refreshAccess(false).catch(error => { accessMessage.textContent = error.message; });
 });

@@ -105,7 +105,7 @@ La seccion **Routers** muestra todos los clientes dados de alta, su sede, estado
 real de conexion, IP VPN actual o ultima conocida, origen publico con puerto,
 fecha de ultima conexion y ultima vez visto. OpenVPN escribe un informe cada
 10 segundos; el panel guarda las ultimas observaciones en `connections.json`
-del volumen persistente, incluso sin navegadores abiertos. No fija las IP.
+del volumen persistente, incluso sin navegadores abiertos.
 
 Si el informe tiene mas de 45 segundos o esta incompleto, el estado pasa a
 **Sin datos recientes**. El historial comienza al instalar esta version. Las
@@ -113,6 +113,48 @@ conexiones que duren menos que el intervalo de muestreo pueden no registrarse.
 No es un registro de auditoria completo. Las fechas se muestran en la zona
 horaria del navegador. Esta actualizacion reinicia OpenVPN una vez para activar
 el informe de estado; conserva CA, certificados, claves y asignaciones del pool.
+
+### IP fijas y grupos de acceso
+
+Cada router recibe una IP fija de `10.80.0.2` a `10.80.0.254`, asociada a su
+identidad de certificado en `vpn-addresses.json`. La reserva se conserva en
+desconexiones, reinicios y redeploys, y no se libera al revocar el certificado.
+No se reciclan IP: esta subred admite 253 reservas de identidad en total. Haz
+copia del volumen completo, incluidas las reservas, para poder restaurarlas.
+La migracion conserva las direcciones ya asignadas del informe de estado y
+`ipp.txt`. El dispositivo existente no necesita otro certificado ni perfil.
+Si sustituyes su certificado creando otra alta, se trata de una identidad nueva.
+
+En **Configuracion → Comunicacion entre dispositivos VPN** puedes elegir:
+
+- **Aislados** (predeterminado): no se permite comunicacion entre dispositivos.
+- **Todos entre si**: permite comunicacion entre todas las identidades vigentes.
+- **Grupos: maestro e hijos**: cada grupo tiene nombre, un maestro y varios
+  hijos seleccionados del inventario. Maestro e hijo pueden iniciar conexiones
+  entre si, en ambos sentidos. El grupo no permite conexiones entre sus hijos.
+
+Los permisos de varios grupos se suman. No hay permisos transitivos: compartir
+maestro no autoriza a los hijos entre si. Si un hijo tambien es maestro en otro
+grupo, se permiten las conexiones explicitamente definidas por ese otro grupo.
+Un maestro con servicios de proxy o forwarding propios puede reenviar trafico;
+es necesario administrar tambien ese equipo si no debe ofrecer ese servicio.
+El firewall del equipo destino puede bloquear servicios aunque la VPN permita
+la comunicacion. Estas reglas solo cubren las IP VPN, no las LAN de las sedes.
+
+El panel guarda `access-policy.json`; un supervisor del servidor aplica las
+reglas nftables de forma atomica cada dos segundos y confirma el resultado en
+`access-applied.json`. El panel distingue **guardado** de **aplicado**. Retirar
+un grupo bloquea tambien sus flujos existentes, sin reiniciar OpenVPN. Si el
+supervisor no puede aplicar las reglas, detiene la VPN para no mantener acceso
+con una politica obsoleta. La tabla `inet oceanvoice_vpn` vive dentro del
+contenedor: no se modifica el firewall del host. El panel sigue sin capacidades
+de red ni acceso al socket Docker.
+
+OpenVPN usa CCD para las direcciones fijas, sin pool dinamico ni
+`client-to-client`, de manera que el trafico entre clientes pasa por nftables.
+`learn-address` valida la IP de origen contra la identidad autenticada para
+evitar que un cliente suplante a otro. Los certificados revocados o caducados
+se excluyen de las reglas aunque sigan referenciados en un grupo guardado.
 
 ### Prueba de integracion aislada
 
@@ -122,3 +164,11 @@ desechable en `/tmp`, sin montar el volumen de produccion. Comprueba emision,
 inventario, duplicados, perfil, revocacion, rechazo con CRL, autenticacion y
 proteccion de las operaciones POST. Usa solo Docker remoto `docker36` para las
 pruebas en esta maquina. La prueba de conexion movil necesita un router real.
+
+`python -m unittest discover -s tests -p test_vpn_policy.py` comprueba reservas,
+antisuplantacion y permisos de grupos. `tests/policy_smoke.py` usa una imagen
+de pruebas `oceanvoice/openvpn-server-test:20261123` construida con el Dockerfile
+del servidor y crea en `docker36` una red y cuatro contenedores desechables con
+etiquetas de propiedad. Prueba trafico TCP real entre tres clientes OpenVPN:
+aislamiento, maestro/hijos, bloqueo entre hijos, modo todos y retirada de acceso.
+No monta el volumen PKI de produccion ni publica puertos.

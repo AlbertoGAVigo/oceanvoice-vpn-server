@@ -59,6 +59,7 @@ export function createPKI(state = process.env.VPN_STATE ?? '/var/lib/openvpn') {
           name.length > 80 || site.length > 120 || /[\x00-\x1f\x7f]/.test(name + site))
         throw failure(400, 'Indica nombre (hasta 80 caracteres) y sede (hasta 120).');
       const all = await inventory();
+      if (all.length >= 253) throw failure(409, 'No quedan direcciones VPN disponibles. Las reservas existentes no se reutilizan.');
       if (all.some(row => row.name.toLowerCase() === name.toLowerCase() && row.site.toLowerCase() === site.toLowerCase() && row.status === 'valid'))
         throw failure(409, 'Ya existe un certificado vigente para ese nombre y sede.');
       const id = `teltonika-${randomUUID()}`;
