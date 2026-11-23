@@ -34,3 +34,20 @@ permitir la puesta en marcha del contenedor sin interaccion.
 Renueva la CRL antes de que expire. Puedes regenerarla en el contenedor con
 `EASYRSA_PKI=/var/lib/openvpn/pki /usr/share/easy-rsa/easyrsa --batch gen-crl`
 y comprobar que sea legible por el proceso de OpenVPN.
+
+
+## Panel web
+
+Configura estas variables en **Environment variables** del stack en Portainer:
+
+| Variable | Valor |
+| --- | --- |
+| `PANEL_USERNAME` | Usuario del panel, sin dos puntos. |
+| `PANEL_PASSWORD` | Contrasena del panel. Guardala en Portainer. |
+| `PANEL_HTTP_PORT` | Puerto TCP del host. Predeterminado: `8085`. |
+| `PANEL_BIND_IP` | IP del host para escuchar. Predeterminado: `127.0.0.1`. Usa `192.168.0.11` para acceso desde la LAN de administracion. |
+
+Sin usuario o contrasena, el panel queda bloqueado. El acceso usa autenticacion
+HTTP Basic. Para transportar las credenciales cifradas, accede mediante un proxy
+HTTPS o un tunel seguro. El panel inicial muestra el endpoint de la VPN y queda
+preparado para integrar la gestion de certificados.
