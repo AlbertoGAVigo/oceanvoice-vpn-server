@@ -54,7 +54,7 @@ HTTPS o un tunel seguro.
 
 ### Alta y gestion de Teltonika
 
-1. Introduce nombre y sede en el panel. Modelo y version de RutOS son opcionales.
+1. Introduce nombre y sede en el panel. Modelo y version del SO son opcionales.
 2. Pulsa **Crear certificado** y descarga el `.ovpn` desde el inventario.
 3. En el Teltonika, crea un cliente OpenVPN y selecciona **Upload config file**.
    Importa el perfil, activa la configuracion y guarda los cambios.
@@ -76,9 +76,22 @@ prioridad sobre esas variables. El protocolo es UDP. El formulario no cambia
 el puerto publicado en Docker ni las reglas NAT: configura esos elementos
 por separado para que el servidor sea accesible en el destino elegido.
 
-El panel se organiza en **Monitorizacion**, **Routers y perfiles**,
+El panel se organiza en **Monitorizacion**, **Clientes y perfiles**,
 **Configuracion** y **Guia de conexion**. Las pestanas admiten navegacion con
 teclado y conservan la seccion seleccionada en la URL.
+
+El menu ocupa la misma barra superior que OCEANVOICE / VPN ADMIN; en pantallas
+pequenas pasa a una segunda linea con desplazamiento horizontal. Las acciones
+Descargar .ovpn y Revocar aparecen como botones en la misma fila.
+
+En Monitorizacion, **Web HTTPS** abre `https://<IP_VPN>/` del cliente conectado
+en una pestana independiente. Es un enlace directo, no un proxy: el ordenador
+del usuario necesita ruta hacia la VPN y permisos de comunicacion, y el cliente
+debe permitir HTTPS en su IP VPN. No se activa acceso publico ni se cambian las
+reglas del dispositivo. Un iframe no evita esos requisitos y puede estar
+bloqueado por las cabeceras de seguridad de la web del equipo. Para acceder
+desde un navegador sin ruta a la VPN haria falta una pasarela autenticada,
+preferiblemente en un origen distinto al del panel de certificados.
 
 El inventario muestra certificados de clientes vigentes, caducados y revocados.
 Su estado no indica si el router esta conectado. La revocacion publica una nueva

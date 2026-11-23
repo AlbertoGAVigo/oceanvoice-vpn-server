@@ -8,44 +8,50 @@
   <script src="/panel.js" defer></script>
 </head>
 <body>
-  <header class="top"><div class="wrap identity"><strong>OCEANVOICE</strong><span>VPN / ADMIN</span></div></header>
-  <main class="wrap">
-    <div class="page-heading"><div><span class="eyebrow">OPENVPN / DOCKER-36NET</span><h1>Centro de control</h1><p>Conexiones, perfiles y configuración de tu VPN.</p></div><div class="endpoint"><span>Destino de los perfiles</span><strong id="endpoint-summary">Cargando…</strong></div></div>
+  <header class="top">
+    <div class="wrap header-bar">
+      <div class="identity"><strong>OCEANVOICE</strong><span>VPN / ADMIN</span></div>
     <nav class="tabs" role="tablist" aria-label="Secciones del panel">
       <button type="button" role="tab" id="tab-monitor" aria-controls="monitor" aria-selected="true" tabindex="0">Monitorización</button>
-      <button type="button" role="tab" id="tab-clients" aria-controls="clients" aria-selected="false" tabindex="-1">Routers y perfiles</button>
+      <button type="button" role="tab" id="tab-clients" aria-controls="clients" aria-selected="false" tabindex="-1">Clientes y perfiles</button>
       <button type="button" role="tab" id="tab-settings" aria-controls="settings" aria-selected="false" tabindex="-1">Configuración</button>
       <button type="button" role="tab" id="tab-guide" aria-controls="guide" aria-selected="false" tabindex="-1">Guía de conexión</button>
     </nav>
+      <span class="header-endpoint" id="endpoint-summary" title="Destino de los perfiles .ovpn">Cargando...</span>
+    </div>
+  </header>
+  <main class="wrap">
+    <h1 class="sr-only">OceanVoice VPN - Panel de control</h1>
     <div id="monitor" role="tabpanel" aria-labelledby="tab-monitor">
     <div class="metrics" aria-label="Resumen de conexiones">
-      <div><span>Routers registrados</span><strong id="metric-total">—</strong></div>
+      <div><span>Clientes registrados</span><strong id="metric-total">—</strong></div>
       <div><span>Conectados</span><strong id="metric-online">—</strong></div>
       <div><span>Desconectados</span><strong id="metric-offline">—</strong></div>
     </div>
     <section aria-labelledby="routers-title">
-      <h2 id="routers-title">Estado de los routers <span class="tag">EN DIRECTO</span></h2>
+      <h2 id="routers-title">Estado de los clientes <span class="tag">EN DIRECTO</span></h2>
       <div class="content">
         <p id="connection-summary" role="status">Cargando conexiones…</p>
-        <div class="table-scroll"><table><thead><tr><th>Router / sede</th><th>Conexión</th><th>IP VPN fija</th><th>Origen público actual / último</th><th>Última conexión</th><th>Última vez visto</th></tr></thead><tbody id="routers"></tbody></table></div>
+        <div class="table-scroll"><table><thead><tr><th>Cliente / sede</th><th>Conexión</th><th>IP VPN fija</th><th>Origen público actual / último</th><th>Última conexión</th><th>Última vez visto</th><th>Gestión</th></tr></thead><tbody id="routers"></tbody></table></div>
+        <p class="management-help">Web HTTPS abre la IP VPN en otra pestaña. Tu ordenador necesita acceso a esa red y la web del cliente debe permitir conexiones desde la VPN.</p>
       </div>
-      <p>Actualización automática cada 10 segundos. Cada router conserva su IP VPN al reconectar y reiniciar. Las reservas se guardan de forma persistente y no se reutilizan.</p>
+      <p>Actualización automática cada 10 segundos. Cada cliente conserva su IP VPN al reconectar y reiniciar. Las reservas se guardan de forma persistente y no se reutilizan.</p>
     </section>
     </div>
     <div id="clients" role="tabpanel" aria-labelledby="tab-clients" hidden>
     <section aria-labelledby="certificates">
-      <h2 id="certificates">Alta de router y certificados</h2>
+      <h2 id="certificates">Clientes y perfiles</h2>
       <div class="content">
-        <form id="create-router">
-          <label>Nombre del router *<input name="name" required maxlength="80" placeholder="Router principal" autocomplete="off"></label>
+        <form id="create-router" class="client-form">
+          <label>Nombre del cliente *<input name="name" required maxlength="80" placeholder="Cliente principal" autocomplete="off"></label>
           <label>Sede *<input name="site" required maxlength="120" placeholder="Vigo" autocomplete="off"></label>
-          <label>Modelo (opcional)<input name="model" maxlength="80" placeholder="Teltonika RUT…"></label>
-          <label>Versión de RutOS (opcional)<input name="firmware" maxlength="80" placeholder="Si la conoces"></label>
+          <label>Modelo (opcional)<input name="model" maxlength="80" placeholder="Modelo del dispositivo"></label>
+          <label>Versión del SO (opcional)<input name="firmware" maxlength="80" placeholder="Si la conoces"></label>
           <button type="submit">Crear certificado</button>
         </form>
         <p id="message" role="status" aria-live="polite"></p>
         <div class="toolbar"><span id="count">Cargando inventario…</span><button id="refresh" type="button">Actualizar</button></div>
-        <div class="table-scroll"><table><thead><tr><th>Router / sede</th><th>Equipo</th><th>Estado</th><th>Caducidad</th><th>Acciones</th></tr></thead><tbody id="inventory"></tbody></table></div>
+        <div class="table-scroll"><table><thead><tr><th>Cliente / sede</th><th>Equipo</th><th>Estado</th><th>Caducidad</th><th>Acciones</th></tr></thead><tbody id="inventory"></tbody></table></div>
       </div>
     </section>
     </div>
@@ -53,7 +59,7 @@
     <section aria-labelledby="settings-title">
       <h2 id="settings-title">Destino de conexión de los perfiles .ovpn</h2>
       <div class="content">
-        <p class="intro">Configura el servidor público y el puerto UDP al que se conectarán los routers al importar un perfil descargado desde este panel.</p>
+        <p class="intro">Configura el servidor público y el puerto UDP al que se conectarán los clientes al importar un perfil descargado desde este panel.</p>
         <form id="endpoint-form">
           <label>Servidor VPN *<input id="vpn-host" name="host" required maxlength="253" placeholder="vpn.oceanvoice.es" autocomplete="off" spellcheck="false" aria-describedby="host-help"></label>
           <label>Puerto UDP *<input id="vpn-port" name="port" required type="number" min="1" max="65535" step="1" placeholder="1194"></label>
@@ -61,7 +67,7 @@
           <div class="form-actions"><button type="submit" id="save-settings" disabled>Guardar configuración</button><span id="settings-source"></span></div>
         </form>
         <p id="settings-message" role="status" aria-live="polite"></p>
-        <div class="notice"><strong>Se aplica a las próximas descargas</strong><p>Los perfiles .ovpn ya importados no cambian automáticamente. Después de guardar, vuelve a descargar e importar el perfil de cada router que lo necesite.</p><p>Este ajuste cambia el destino del perfil. El puerto publicado en Portainer y la redirección de puertos del router de Internet deben coincidir con ese destino; se administran por separado.</p></div>
+        <div class="notice"><strong>Se aplica a las próximas descargas</strong><p>Los perfiles .ovpn ya importados no cambian automáticamente. Después de guardar, vuelve a descargar e importar el perfil de cada cliente que lo necesite.</p><p>Este ajuste cambia el destino del perfil. El puerto publicado en Portainer y la redirección de puertos del router de Internet deben coincidir con ese destino; se administran por separado.</p></div>
       </div>
     </section>
     <section aria-labelledby="access-title">
@@ -88,7 +94,7 @@
     <section>
       <h2>Conectar un Teltonika por red móvil</h2>
       <ol>
-        <li>Revisa el servidor y el puerto en Configuración. En Routers y perfiles, introduce nombre y sede y pulsa Crear certificado.</li>
+        <li>Revisa el servidor y el puerto en Configuración. En Clientes y perfiles, introduce nombre y sede y pulsa Crear certificado.</li>
         <li>Descarga su perfil .ovpn. Contiene una clave privada: guárdalo de forma segura y úsalo solo en ese router.</li>
         <li>En Services → VPN → OpenVPN del Teltonika, crea un cliente y selecciona Upload config file. Importa el perfil y activa la conexión.</li>
         <li>Con la salida a Internet por red móvil, comprueba en los logs del router “Initialization Sequence Completed” y una IP 10.80.0.x.</li>

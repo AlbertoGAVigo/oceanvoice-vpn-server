@@ -10,6 +10,10 @@ async function api(url, data) {
   if (!response.ok) throw new Error(result.error ?? 'No se pudo completar la operación.');
   return result;
 }
+function detailCell(row, title, subtitle) {
+  const td = cell(row, ''); const strong = document.createElement('strong'); strong.textContent = title;
+  const small = document.createElement('small'); small.textContent = subtitle; td.append(strong, small); return td;
+}
 function cell(row, text) { const td = document.createElement('td'); td.textContent = text; row.append(td); return td; }
 async function refresh() {
   await refreshRouters();
@@ -18,26 +22,27 @@ async function refresh() {
   document.querySelector('#count').textContent = `${rows.length} certificados · ${rows.filter(r => r.status === 'valid').length} vigentes`;
   for (const item of rows) {
     const row = document.createElement('tr');
-    cell(row, `${item.name} / ${item.site || 'Sin sede'}`);
-    cell(row, [item.model, item.firmware].filter(Boolean).join(' · ') || '—');
+    detailCell(row, item.name, item.site || 'Sin sede');
+    detailCell(row, item.model || '—', item.firmware ? `SO: ${item.firmware}` : '');
     const state = cell(row, { valid: 'Vigente', revoked: 'Revocado', expired: 'Caducado' }[item.status]);
     state.className = item.status;
     cell(row, new Date(item.expires).toLocaleDateString('es-ES'));
     const actions = cell(row, '');
+    const controls = document.createElement('div'); controls.className = 'row-actions'; actions.append(controls);
     if (item.status === 'valid') {
       const link = document.createElement('a');
-      link.href = `/api/certificates/${item.id}/profile`; link.textContent = 'Descargar .ovpn'; actions.append(link);
+      link.href = `/api/certificates/${item.id}/profile`; link.textContent = 'Descargar .ovpn'; link.className = 'button'; controls.append(link);
     }
     const revoke = document.createElement('button'); revoke.type = 'button';
-    revoke.textContent = item.status === 'revoked' ? 'Republicar revocación' : 'Revocar';
+    revoke.textContent = item.status === 'revoked' ? 'Republicar CRL' : 'Revocar';
     revoke.className = 'danger';
     revoke.addEventListener('click', () => {
       if (busy || !confirm(`¿Revocar el acceso de ${item.name} (${item.site})? El perfil dejará de permitir nuevas conexiones.`)) return;
       perform(async () => { await api(`/api/certificates/${item.id}/revoke`, {}); message.textContent = 'Revocación publicada. El perfil ya no permite nuevas conexiones.'; });
     });
-    actions.append(revoke); inventory.append(row);
+    controls.append(revoke); inventory.append(row);
   }
-  if (!rows.length) { const row = document.createElement('tr'); const td = cell(row, 'No hay certificados de clientes. Da de alta el primer router.'); td.colSpan = 5; inventory.append(row); }
+  if (!rows.length) { const row = document.createElement('tr'); const td = cell(row, 'No hay certificados de clientes. Da de alta el primer cliente.'); td.colSpan = 5; inventory.append(row); }
 }
 async function perform(action) {
   if (busy) return;
@@ -65,15 +70,23 @@ async function refreshRouters() {
     : 'Estado de conexión no disponible: esperando un informe reciente de OpenVPN.';
   for (const item of result.routers) {
     const row = document.createElement('tr');
-    cell(row, `${item.name} / ${item.site || 'Sin sede'}`);
+    detailCell(row, item.name, item.site || 'Sin sede');
     const state = cell(row, { connected: 'Conectado', disconnected: 'Desconectado', unknown: 'Sin datos recientes' }[item.connection]);
     state.className = item.connection === 'connected' ? 'valid' : '';
     cell(row, item.assignedIP || item.tunnelIP || item.lastTunnelIP || 'Reserva pendiente');
     cell(row, item.remoteAddress || (item.lastRemoteAddress ? `${item.lastRemoteAddress} (último)` : 'Sin registro'));
     cell(row, dateTime(item.connectedSince || item.lastConnected));
-    cell(row, dateTime(item.lastSeen)); target.append(row);
+    cell(row, dateTime(item.lastSeen));
+    const management = cell(row, '');
+    const ip = item.assignedIP || item.tunnelIP;
+    if (item.connection === 'connected' && item.status === 'valid' && /^10\.80\.0\.\d{1,3}$/.test(ip ?? '')) {
+      const link = document.createElement('a'); link.className = 'button secondary';
+      link.href = `https://${ip}/`; link.target = '_blank'; link.rel = 'noopener noreferrer';
+      link.textContent = 'Web HTTPS ↗'; link.title = 'Abrir la gestión del cliente. Tu ordenador necesita acceso a la red VPN.'; management.append(link);
+    } else management.textContent = '—';
+    target.append(row);
   }
-  if (!result.routers.length) { const row = document.createElement('tr'); const td = cell(row, 'Todavía no hay routers. Da de alta el primero en Certificados.'); td.colSpan = 6; target.append(row); }
+  if (!result.routers.length) { const row = document.createElement('tr'); const td = cell(row, 'Todavía no hay clientes. Da de alta el primero en Clientes y perfiles.'); td.colSpan = 7; target.append(row); }
 }
 setInterval(() => {
   if (!busy) refreshRouters().then(() => refreshAccess(false)).catch(() => {
