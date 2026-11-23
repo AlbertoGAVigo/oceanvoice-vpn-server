@@ -46,6 +46,7 @@ Configura estas variables en **Environment variables** del stack en Portainer:
 | `PANEL_PASSWORD` | Contrasena del panel. Guardala en Portainer. |
 | `PANEL_HTTP_PORT` | Puerto TCP del host. Predeterminado: `8085`. |
 | `PANEL_BIND_IP` | IP del host para escuchar. Predeterminado: `127.0.0.1`. Usa `192.168.0.11` para acceso desde la LAN de administracion. |
+| `PANEL_SECOND_BIND_IP` | Segunda IP del host para el mismo puerto. Predeterminado: `127.0.0.2`. En `docker-36net`, usa `192.168.101.11` junto con `192.168.0.11` como IP principal. |
 
 Sin usuario o contrasena, el panel queda bloqueado. El acceso usa autenticacion
 HTTP Basic. Para transportar las credenciales cifradas, accede mediante un proxy
