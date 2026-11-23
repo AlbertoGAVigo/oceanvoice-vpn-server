@@ -15,7 +15,7 @@ services:
       - openvpn-pki:/var/lib/openvpn
 
   panel:
-    image: oceanvoice/openvpn-panel:0.3.0
+    image: oceanvoice/openvpn-panel:0.4.0
     build: ./panel
     restart: unless-stopped
     environment:

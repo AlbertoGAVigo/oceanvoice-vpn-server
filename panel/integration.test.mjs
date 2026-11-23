@@ -4,8 +4,15 @@ import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, writeFile, readFile, chmod } from 'node:fs/promises';
 import { createPKI } from './pki.mjs';
+import { createSettings, validateEndpoint } from './settings.mjs';
 const exec = promisify(execFile);
 const state = await mkdtemp('/tmp/oceanvoice-test-');
+const settings = createSettings(state);
+for (const host of ['https://vpn.example.com', 'vpn.example.com\nremote bad', '-bad.example', '999.999.999.999', '../pki', ''])
+  assert.throws(() => validateEndpoint({ host, port: 1194 }), { status: 400 });
+for (const port of [0, 65536, '1.5', '1194\nremote bad', null])
+  assert.throws(() => validateEndpoint({ host: 'vpn.example.com', port }), { status: 400 });
+assert.equal(validateEndpoint({ host: '2001:db8::1', port: '443' }).port, 443);
 const env = { ...process.env, EASYRSA_PKI: `${state}/pki`, EASYRSA_BATCH: '1', EASYRSA_REQ_CN: 'test-ca' };
 const rsa = (...args) => exec('/usr/share/easy-rsa/easyrsa', ['--batch', ...args], { env });
 await rsa('init-pki'); await rsa('build-ca', 'nopass');
@@ -32,12 +39,25 @@ await new Promise((resolve, reject) => { server.stdout.once('data', resolve); se
 try {
   const auth = { Authorization: `Basic ${Buffer.from('test:test-only').toString('base64')}` };
   assert.equal((await fetch('http://127.0.0.1:8080/api/certificates')).status, 401);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/settings')).status, 401);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/settings', { method: 'POST', headers: auth, body: '{}' })).status, 403);
+  assert.equal((await (await fetch('http://127.0.0.1:8080/api/settings', { headers: auth })).json()).host, 'vpn.oceanvoice.es');
+  const saveHeaders = { ...auth, 'Content-Type': 'application/json', 'X-OceanVoice-Action': '1' };
+  const saved = await fetch('http://127.0.0.1:8080/api/settings', { method: 'POST', headers: saveHeaders, body: JSON.stringify({ host: 'VPN.Example.COM', port: '21194' }) });
+  assert.equal(saved.status, 200);
+  assert.equal((await createSettings(state).get()).host, 'vpn.example.com');
+  assert.equal((await createSettings(state).get()).port, 21194);
+  const invalid = await fetch('http://127.0.0.1:8080/api/settings', { method: 'POST', headers: saveHeaders, body: JSON.stringify({ host: 'https://bad', port: 0 }) });
+  assert.equal(invalid.status, 400);
+  assert.equal((await settings.get()).port, 21194);
   assert.equal((await fetch('http://127.0.0.1:8080/api/certificates', { headers: auth })).status, 200);
   assert.equal((await fetch('http://127.0.0.1:8080/api/certificates', { method: 'POST', headers: auth, body: '{}' })).status, 403);
   const response = await fetch('http://127.0.0.1:8080/api/certificates', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json', 'X-OceanVoice-Action': '1' }, body: JSON.stringify({ name: 'Router API', site: 'Madrid', model: 'RUT', firmware: '7' }) });
   assert.equal(response.status, 200); const row = await response.json();
   const download = await fetch(`http://127.0.0.1:8080/api/certificates/${row.id}/profile`, { headers: auth });
   assert.equal(download.status, 200); assert(download.headers.get('content-disposition').includes('.ovpn'));
+  assert.match(await download.text(), /^remote vpn\.example\.com 21194$/m);
+  assert.match(await createPKI(state).profile(row.id), /^remote vpn\.example\.com 21194$/m);
   assert.equal((await fetch('http://127.0.0.1:8080/panel.js', { headers: auth })).status, 200);
 } finally { server.kill(); }
-console.log('PASS: issue, inventory, duplicates, inline profile, revocation/CRL, retry, authentication, CSRF and HTTP download.');
+console.log('PASS: certificate lifecycle, CRL, authentication, CSRF, endpoint validation/persistence and custom endpoint in HTTP .ovpn download.');

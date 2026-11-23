@@ -5,6 +5,8 @@ import { createPKI, failure } from './pki.mjs';
 const pki = createPKI();
 import { createConnections } from './connections.mjs';
 const connections = createConnections();
+import { createSettings } from './settings.mjs';
+const settings = createSettings();
 
 const username = process.env.PANEL_USERNAME ?? '';
 const password = process.env.PANEL_PASSWORD ?? '';
@@ -49,7 +51,8 @@ const server = createServer(async (request, response) => {
           (request.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(request.headers['sec-fetch-site']))))
         throw failure(403, 'Solicitud no permitida.');
       let result;
-      if (route === '/api/routers' && request.method === 'GET') {
+      if (route === '/api/settings' && request.method === 'GET') result = await settings.get();
+      else if (route === '/api/routers' && request.method === 'GET') {
         const rows = await pki.list();
         const snapshot = await connections.sample();
         result = { available: snapshot.available, updatedAt: snapshot.updatedAt ?? null, routers: rows.map(row => {
@@ -59,7 +62,7 @@ const server = createServer(async (request, response) => {
         }) };
       }
       else if (route === '/api/certificates' && request.method === 'GET') result = await pki.list();
-      else if (route === '/api/certificates' && request.method === 'POST') {
+      else if (['/api/certificates', '/api/settings'].includes(route) && request.method === 'POST') {
         let body = '';
         for await (const chunk of request) {
           body += chunk;
@@ -67,7 +70,7 @@ const server = createServer(async (request, response) => {
         }
         let input;
         try { input = JSON.parse(body); } catch { throw failure(400, 'Formulario inválido.'); }
-        result = await pki.create(input);
+        result = route === '/api/settings' ? await settings.save(input) : await pki.create(input);
       } else {
         const match = /^\/api\/certificates\/([a-zA-Z0-9_-]+)\/(profile|revoke)$/.exec(route);
         if (match?.[2] === 'profile' && request.method === 'GET') {

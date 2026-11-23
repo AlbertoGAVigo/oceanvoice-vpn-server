@@ -3,11 +3,13 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { randomUUID, X509Certificate } from 'node:crypto';
 import path from 'node:path';
+import { createSettings } from './settings.mjs';
 
 const exec = promisify(execFile);
 process.umask(0o077);
 export const failure = (status, message) => Object.assign(new Error(message), { status });
 export function createPKI(state = process.env.VPN_STATE ?? '/var/lib/openvpn') {
+  const settings = createSettings(state);
   const pki = path.join(state, 'pki');
   const file = (...parts) => path.join(pki, ...parts);
   const run = (...args) => exec('/usr/share/easy-rsa/easyrsa', ['--batch', ...args], {
@@ -52,7 +54,7 @@ export function createPKI(state = process.env.VPN_STATE ?? '/var/lib/openvpn') {
       const name = typeof input?.name === 'string' ? input.name.trim() : ''; const site = typeof input?.site === 'string' ? input.site.trim() : '';
       const model = typeof input?.model === 'string' ? input.model.trim() : '';
       const firmware = typeof input?.firmware === 'string' ? input.firmware.trim() : '';
-      if ( model.length > 80 || firmware.length > 80 || /[\x00-\x1f\x7f]/.test(model + firmware)) throw failure(400, 'Indica modelo y versiÃ³n de RutOS (hasta 80 caracteres).');
+      if (model.length > 80 || firmware.length > 80 || /[\x00-\x1f\x7f]/.test(model + firmware)) throw failure(400, 'Modelo y firmware: hasta 80 caracteres.');
       if (typeof name !== 'string' || typeof site !== 'string' || !name || !site ||
           name.length > 80 || site.length > 120 || /[\x00-\x1f\x7f]/.test(name + site))
         throw failure(400, 'Indica nombre (hasta 80 caracteres) y sede (hasta 120).');
@@ -80,10 +82,8 @@ export function createPKI(state = process.env.VPN_STATE ?? '/var/lib/openvpn') {
     profile: (id) => locked(async () => {
       const row = (await inventory()).find(row => row.id === id);
       if (!row) throw failure(404, 'Certificado no encontrado.');
-      if (row.status !== 'valid') throw failure(409, 'El certificado no estÃƒÂ¡ vigente.');
-      const host = process.env.VPN_HOST ?? 'vpn.oceanvoice.es';
-      const port = process.env.VPN_PORT ?? '1194';
-      if (!/^[a-zA-Z0-9.-]+$/.test(host) || !/^\d+$/.test(port) || +port < 1 || +port > 65535) throw failure(503, 'Endpoint VPN mal configurado.');
+      if (row.status !== 'valid') throw failure(409, 'El certificado no est\u00e1 vigente.');
+      const { host, port } = await settings.get();
       const ca = await readFile(file('ca.crt'), 'utf8');
       const cert = new X509Certificate(await readFile(file('issued', `${id}.crt`))).toString();
       const key = await readFile(file('private', `${id}.key`), 'utf8');

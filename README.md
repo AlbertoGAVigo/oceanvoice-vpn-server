@@ -64,8 +64,21 @@ HTTPS o un tunel seguro.
 
 El perfil incluye CA, certificado, clave privada del cliente y `tls-crypt`.
 No compartas perfiles entre routers. El endpoint predeterminado es
-`vpn.oceanvoice.es:1194/UDP`; `VPN_HOST` permite cambiar el nombre y
-`OPENVPN_PORT` define el puerto externo tanto del servidor como del perfil.
+`vpn.oceanvoice.es:1194/UDP`. En **Configuracion**, introduce el servidor y
+puerto que deben aparecer en los perfiles descargados y pulsa **Guardar**.
+Se conservan en `panel-settings.json` dentro del volumen PKI y se aplican a
+cada nueva descarga, incluidos los certificados que ya existian. Los perfiles
+ya importados en los routers deben descargarse e importarse de nuevo.
+
+Si aun no hay ajustes guardados, `VPN_HOST` y `OPENVPN_PORT` proporcionan los
+valores iniciales del perfil. Los ajustes guardados desde el panel tienen
+prioridad sobre esas variables. El protocolo es UDP. El formulario no cambia
+el puerto publicado en Docker ni las reglas NAT: configura esos elementos
+por separado para que el servidor sea accesible en el destino elegido.
+
+El panel se organiza en **Monitorizacion**, **Routers y perfiles**,
+**Configuracion** y **Guia de conexion**. Las pestanas admiten navegacion con
+teclado y conservan la seccion seleccionada en la URL.
 
 El inventario muestra certificados de clientes vigentes, caducados y revocados.
 Su estado no indica si el router esta conectado. La revocacion publica una nueva

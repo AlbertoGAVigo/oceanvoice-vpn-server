@@ -41,11 +41,11 @@ async function refresh() {
 }
 async function perform(action) {
   if (busy) return;
-  busy = true; document.querySelectorAll('button').forEach(b => b.disabled = true);
+  busy = true; document.querySelectorAll('#create-router button, #inventory button, #refresh').forEach(b => b.disabled = true);
   message.textContent = 'Procesando…';
   try { await action(); await refresh(); }
   catch (error) { message.textContent = error.message; }
-  finally { busy = false; document.querySelectorAll('button').forEach(b => b.disabled = false); }
+  finally { busy = false; document.querySelectorAll('#create-router button, #inventory button, #refresh').forEach(b => b.disabled = false); }
 }
 form.addEventListener('submit', event => {
   event.preventDefault();
@@ -56,6 +56,9 @@ refresh().catch(error => { message.textContent = error.message; document.querySe
 function dateTime(value) { return value ? new Date(value).toLocaleString('es-ES') : 'Sin registro'; }
 async function refreshRouters() {
   const result = await api('/api/routers');
+  document.querySelector('#metric-total').textContent = result.routers.length;
+  document.querySelector('#metric-online').textContent = result.available ? result.routers.filter(r => r.connection === 'connected').length : '—';
+  document.querySelector('#metric-offline').textContent = result.available ? result.routers.filter(r => r.connection === 'disconnected').length : '—';
   const target = document.querySelector('#routers'); target.replaceChildren();
   document.querySelector('#connection-summary').textContent = result.available
     ? `${result.routers.filter(r => r.connection === 'connected').length} conectados · Estado del servidor: ${dateTime(result.updatedAt)}`
@@ -75,6 +78,57 @@ async function refreshRouters() {
 setInterval(() => {
   if (!busy) refreshRouters().catch(() => {
     document.querySelector('#connection-summary').textContent = 'No se pudo actualizar el estado. Los datos de la tabla pueden estar desactualizados.';
+    document.querySelector('#metric-online').textContent = '—';
+    document.querySelector('#metric-offline').textContent = '—';
     document.querySelectorAll('#routers tr td:nth-child(2)').forEach(td => { td.textContent = 'Sin datos recientes'; td.className = ''; });
   });
 }, 10000);
+
+const tabs = [...document.querySelectorAll('[role="tab"]')];
+function selectTab(id) {
+  if (!tabs.some(tab => tab.getAttribute('aria-controls') === id)) id = 'monitor';
+  for (const tab of tabs) {
+    const selected = tab.getAttribute('aria-controls') === id;
+    tab.setAttribute('aria-selected', String(selected)); tab.tabIndex = selected ? 0 : -1;
+    document.getElementById(tab.getAttribute('aria-controls')).hidden = !selected;
+  }
+}
+for (const tab of tabs) {
+  tab.addEventListener('click', () => { location.hash = tab.getAttribute('aria-controls'); });
+  tab.addEventListener('keydown', event => {
+    const index = tabs.indexOf(tab);
+    const next = event.key === 'ArrowRight' ? (index + 1) % tabs.length : event.key === 'ArrowLeft' ? (index + tabs.length - 1) % tabs.length : event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : null;
+    if (next === null) return;
+    event.preventDefault(); tabs[next].focus(); tabs[next].click();
+  });
+}
+window.addEventListener('hashchange', () => selectTab(location.hash.slice(1)));
+selectTab(location.hash.slice(1));
+
+const endpointForm = document.querySelector('#endpoint-form');
+const settingsMessage = document.querySelector('#settings-message');
+const saveSettings = document.querySelector('#save-settings');
+function showEndpoint(settings) {
+  document.querySelector('#vpn-host').value = settings.host;
+  document.querySelector('#vpn-port').value = settings.port;
+  const host = settings.host.includes(':') ? `[${settings.host}]` : settings.host;
+  document.querySelector('#endpoint-summary').textContent = `${host}:${settings.port} / UDP`;
+  document.querySelector('#settings-source').textContent = settings.source === 'panel' ? `Guardado: ${dateTime(settings.updatedAt)}` : 'Valores iniciales del despliegue';
+}
+api('/api/settings').then(settings => { showEndpoint(settings); saveSettings.disabled = false; }).catch(error => {
+  settingsMessage.textContent = error.message;
+  document.querySelector('#endpoint-summary').textContent = 'Configuración no disponible';
+});
+endpointForm.addEventListener('input', () => { settingsMessage.textContent = 'Cambios sin guardar. Las descargas siguen usando la configuración guardada.'; });
+endpointForm.addEventListener('submit', async event => {
+  event.preventDefault(); if (saveSettings.disabled) return;
+  saveSettings.disabled = true;
+  endpointForm.querySelectorAll('input').forEach(input => input.readOnly = true);
+  settingsMessage.textContent = 'Guardando…';
+  try {
+    const settings = await api('/api/settings', Object.fromEntries(new FormData(endpointForm)));
+    showEndpoint(settings);
+    settingsMessage.textContent = 'Configuración guardada. Las próximas descargas .ovpn usarán este servidor y puerto.';
+  } catch (error) { settingsMessage.textContent = error.message; }
+  finally { saveSettings.disabled = false; endpointForm.querySelectorAll('input').forEach(input => input.readOnly = false); }
+});
