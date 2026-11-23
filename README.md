@@ -8,11 +8,11 @@ su PKI. El alta de clientes y las rutas de las sedes se configuran por separado.
 
 1. Comprueba que el host tiene `/dev/net/tun`, que el puerto UDP elegido esta
    libre y que la subred `10.80.0.0/24` no se solapa con las redes existentes.
-2. En Portainer, abre `docker-36net` y crea el stack `oceanvoice-vpn-server`
-   con metodo **Repository**. Usa
-   `https://github.com/AlbertoGAVigo/oceanvoice-vpn-server.git`, la referencia
-   `refs/heads/main` y el archivo `compose.yaml`. Si el repo es privado,
-   introduce en Portainer una credencial de solo lectura para ese repositorio.
+2. En Portainer, crea una fuente Git con
+   `https://github.com/AlbertoGAVigo/oceanvoice-vpn-server.git`. El repositorio
+   es publico y permite lectura sin credenciales. En `docker-36net`, crea el
+   stack `oceanvoice-openvpn-server` con el metodo **Repository**, selecciona
+   esa fuente y usa `refs/heads/main` y `compose.yaml`.
 3. El puerto publicado es `1194/udp`. Si necesitas otro puerto externo en el
    host, configura `OPENVPN_PORT` en las variables del stack. OpenVPN sigue
    escuchando en el puerto 1194 dentro del contenedor.
