@@ -1,0 +1,19 @@
+services:
+  openvpn:
+    image: oceanvoice/openvpn-server:0.1.0
+    build: .
+    restart: unless-stopped
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    sysctls:
+      net.ipv4.ip_forward: '0'
+    ports:
+      - "${OPENVPN_PORT:-1194}:1194/udp"
+    volumes:
+      - openvpn-pki:/var/lib/openvpn
+
+volumes:
+  openvpn-pki:
+    name: oceanvoice-openvpn-pki
