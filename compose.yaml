@@ -23,6 +23,7 @@ services:
       PANEL_PASSWORD: "${PANEL_PASSWORD:-}"
     ports:
       - "${PANEL_BIND_IP:-127.0.0.1}:${PANEL_HTTP_PORT:-8085}:8080"
+      - "${PANEL_SECOND_BIND_IP:-127.0.0.2}:${PANEL_HTTP_PORT:-8085}:8080"
 
 volumes:
   openvpn-pki:
