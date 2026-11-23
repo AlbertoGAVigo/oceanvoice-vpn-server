@@ -14,6 +14,16 @@ services:
     volumes:
       - openvpn-pki:/var/lib/openvpn
 
+  panel:
+    image: oceanvoice/openvpn-panel:0.1.0
+    build: ./panel
+    restart: unless-stopped
+    environment:
+      PANEL_USERNAME: "${PANEL_USERNAME:-}"
+      PANEL_PASSWORD: "${PANEL_PASSWORD:-}"
+    ports:
+      - "${PANEL_BIND_IP:-127.0.0.1}:${PANEL_HTTP_PORT:-8085}:8080"
+
 volumes:
   openvpn-pki:
     name: oceanvoice-openvpn-pki
