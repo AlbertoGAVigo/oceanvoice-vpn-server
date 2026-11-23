@@ -86,6 +86,21 @@ indice antes de retirar manualmente ese directorio de bloqueo.
 La primera fase valida el tunel del router. El acceso a las LAN de las sedes
 requiere despues rutas, forwarding y reglas de firewall especificas.
 
+### Inventario de routers y conexiones
+
+La seccion **Routers** muestra todos los clientes dados de alta, su sede, estado
+real de conexion, IP VPN actual o ultima conocida, origen publico con puerto,
+fecha de ultima conexion y ultima vez visto. OpenVPN escribe un informe cada
+10 segundos; el panel guarda las ultimas observaciones en `connections.json`
+del volumen persistente, incluso sin navegadores abiertos. No fija las IP.
+
+Si el informe tiene mas de 45 segundos o esta incompleto, el estado pasa a
+**Sin datos recientes**. El historial comienza al instalar esta version. Las
+conexiones que duren menos que el intervalo de muestreo pueden no registrarse.
+No es un registro de auditoria completo. Las fechas se muestran en la zona
+horaria del navegador. Esta actualizacion reinicia OpenVPN una vez para activar
+el informe de estado; conserva CA, certificados, claves y asignaciones del pool.
+
 ### Prueba de integracion aislada
 
 `panel/integration.test.mjs` se ejecuta dentro de la imagen del panel, desde

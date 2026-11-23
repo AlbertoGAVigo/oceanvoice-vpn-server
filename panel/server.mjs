@@ -3,10 +3,17 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { createPKI, failure } from './pki.mjs';
 const pki = createPKI();
+import { createConnections } from './connections.mjs';
+const connections = createConnections();
 
 const username = process.env.PANEL_USERNAME ?? '';
 const password = process.env.PANEL_PASSWORD ?? '';
 const configured = username.length > 0 && !username.includes(':') && password.length > 0;
+if (configured) {
+  const sample = () => connections.sample().catch(error => console.error('Connection sampling failed:', error.code ?? 'internal'));
+  sample();
+  setInterval(sample, 5000).unref();
+}
 const hash = (value) => createHash('sha256').update(value).digest();
 const expected = hash(Buffer.from(username + ':' + password).toString('base64'));
 const assets = new Map([
@@ -42,7 +49,16 @@ const server = createServer(async (request, response) => {
           (request.headers['sec-fetch-site'] && !['same-origin', 'none'].includes(request.headers['sec-fetch-site']))))
         throw failure(403, 'Solicitud no permitida.');
       let result;
-      if (route === '/api/certificates' && request.method === 'GET') result = await pki.list();
+      if (route === '/api/routers' && request.method === 'GET') {
+        const rows = await pki.list();
+        const snapshot = await connections.sample();
+        result = { available: snapshot.available, updatedAt: snapshot.updatedAt ?? null, routers: rows.map(row => {
+          const live = snapshot.clients.find(client => client.id === row.id);
+          return { ...row, ...snapshot.history[row.id], ...live,
+            connection: !snapshot.available ? 'unknown' : live ? 'connected' : 'disconnected' };
+        }) };
+      }
+      else if (route === '/api/certificates' && request.method === 'GET') result = await pki.list();
       else if (route === '/api/certificates' && request.method === 'POST') {
         let body = '';
         for await (const chunk of request) {

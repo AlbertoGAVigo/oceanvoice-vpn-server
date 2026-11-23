@@ -1,6 +1,6 @@
 services:
   openvpn:
-    image: oceanvoice/openvpn-server:0.1.0
+    image: oceanvoice/openvpn-server:0.1.1
     build: .
     restart: unless-stopped
     cap_add:
@@ -15,7 +15,7 @@ services:
       - openvpn-pki:/var/lib/openvpn
 
   panel:
-    image: oceanvoice/openvpn-panel:0.2.0
+    image: oceanvoice/openvpn-panel:0.3.0
     build: ./panel
     restart: unless-stopped
     environment:

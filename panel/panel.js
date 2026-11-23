@@ -12,6 +12,7 @@ async function api(url, data) {
 }
 function cell(row, text) { const td = document.createElement('td'); td.textContent = text; row.append(td); return td; }
 async function refresh() {
+  await refreshRouters();
   const rows = await api('/api/certificates');
   inventory.replaceChildren();
   document.querySelector('#count').textContent = `${rows.length} certificados · ${rows.filter(r => r.status === 'valid').length} vigentes`;
@@ -52,3 +53,28 @@ form.addEventListener('submit', event => {
 });
 document.querySelector('#refresh').addEventListener('click', () => perform(async () => { message.textContent = ''; }));
 refresh().catch(error => { message.textContent = error.message; document.querySelector('#count').textContent = 'Inventario no disponible'; });
+function dateTime(value) { return value ? new Date(value).toLocaleString('es-ES') : 'Sin registro'; }
+async function refreshRouters() {
+  const result = await api('/api/routers');
+  const target = document.querySelector('#routers'); target.replaceChildren();
+  document.querySelector('#connection-summary').textContent = result.available
+    ? `${result.routers.filter(r => r.connection === 'connected').length} conectados · Estado del servidor: ${dateTime(result.updatedAt)}`
+    : 'Estado de conexión no disponible: esperando un informe reciente de OpenVPN.';
+  for (const item of result.routers) {
+    const row = document.createElement('tr');
+    cell(row, `${item.name} / ${item.site || 'Sin sede'}`);
+    const state = cell(row, { connected: 'Conectado', disconnected: 'Desconectado', unknown: 'Sin datos recientes' }[item.connection]);
+    state.className = item.connection === 'connected' ? 'valid' : '';
+    cell(row, item.tunnelIP || (item.lastTunnelIP ? `${item.lastTunnelIP} (última)` : 'Sin asignar'));
+    cell(row, item.remoteAddress || (item.lastRemoteAddress ? `${item.lastRemoteAddress} (último)` : 'Sin registro'));
+    cell(row, dateTime(item.connectedSince || item.lastConnected));
+    cell(row, dateTime(item.lastSeen)); target.append(row);
+  }
+  if (!result.routers.length) { const row = document.createElement('tr'); const td = cell(row, 'Todavía no hay routers. Da de alta el primero en Certificados.'); td.colSpan = 6; target.append(row); }
+}
+setInterval(() => {
+  if (!busy) refreshRouters().catch(() => {
+    document.querySelector('#connection-summary').textContent = 'No se pudo actualizar el estado. Los datos de la tabla pueden estar desactualizados.';
+    document.querySelectorAll('#routers tr td:nth-child(2)').forEach(td => { td.textContent = 'Sin datos recientes'; td.className = ''; });
+  });
+}, 10000);
