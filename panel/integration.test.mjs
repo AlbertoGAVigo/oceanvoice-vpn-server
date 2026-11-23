@@ -1,0 +1,43 @@
+// Run inside the panel image, with disposable /tmp state; never against production PKI.
+import assert from 'node:assert/strict';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
+import { mkdtemp, writeFile, readFile, chmod } from 'node:fs/promises';
+import { createPKI } from './pki.mjs';
+const exec = promisify(execFile);
+const state = await mkdtemp('/tmp/oceanvoice-test-');
+const env = { ...process.env, EASYRSA_PKI: `${state}/pki`, EASYRSA_BATCH: '1', EASYRSA_REQ_CN: 'test-ca' };
+const rsa = (...args) => exec('/usr/share/easy-rsa/easyrsa', ['--batch', ...args], { env });
+await rsa('init-pki'); await rsa('build-ca', 'nopass');
+delete env.EASYRSA_REQ_CN;
+await rsa('build-server-full', 'oceanvoice-server', 'nopass'); await rsa('gen-crl');
+await writeFile(`${state}/tls-crypt.key`, '-----BEGIN OpenVPN Static key V1-----\ntest-fixture\n-----END OpenVPN Static key V1-----\n');
+const pki = createPKI(state);
+assert.deepEqual(await pki.list(), []);
+await assert.rejects(pki.create({ name: '', site: 'Vigo' }), { status: 400 });
+const client = await pki.create({ name: 'Router prueba', site: 'Vigo' });
+assert.equal(client.status, 'valid'); assert.equal(client.model, '');
+await assert.rejects(pki.create({ name: 'Router prueba', site: 'Vigo' }), { status: 409 });
+const profile = await pki.profile(client.id);
+for (const token of ['remote vpn.oceanvoice.es 1194', '<ca>', '<cert>', '<key>', '<tls-crypt>', 'remote-cert-tls server']) assert(profile.includes(token));
+await exec('openssl', ['verify', '-CAfile', `${state}/pki/ca.crt`, `${state}/pki/issued/${client.id}.crt`]);
+await pki.revoke(client.id);
+assert.equal((await pki.list())[0].status, 'revoked');
+await assert.rejects(pki.profile(client.id), { status: 409 });
+await pki.revoke(client.id);
+await assert.rejects(exec('openssl', ['verify', '-CAfile', `${state}/pki/ca.crt`, '-CRLfile', `${state}/pki/crl.pem`, '-crl_check', `${state}/pki/revoked/certs_by_serial/${client.serial}.crt`]), error => error.stderr.includes('certificate revoked'));
+await exec('openssl', ['crl', '-in', `${state}/pki/crl.pem`, '-noout', '-nextupdate']);
+const server = spawn('node', ['server.mjs'], { env: { ...process.env, VPN_STATE: state, PANEL_USERNAME: 'test', PANEL_PASSWORD: 'test-only' }, stdio: ['ignore', 'pipe', 'pipe'] });
+await new Promise((resolve, reject) => { server.stdout.once('data', resolve); server.once('error', reject); server.once('exit', code => reject(new Error(`Server exited ${code}`))); });
+try {
+  const auth = { Authorization: `Basic ${Buffer.from('test:test-only').toString('base64')}` };
+  assert.equal((await fetch('http://127.0.0.1:8080/api/certificates')).status, 401);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/certificates', { headers: auth })).status, 200);
+  assert.equal((await fetch('http://127.0.0.1:8080/api/certificates', { method: 'POST', headers: auth, body: '{}' })).status, 403);
+  const response = await fetch('http://127.0.0.1:8080/api/certificates', { method: 'POST', headers: { ...auth, 'Content-Type': 'application/json', 'X-OceanVoice-Action': '1' }, body: JSON.stringify({ name: 'Router API', site: 'Madrid', model: 'RUT', firmware: '7' }) });
+  assert.equal(response.status, 200); const row = await response.json();
+  const download = await fetch(`http://127.0.0.1:8080/api/certificates/${row.id}/profile`, { headers: auth });
+  assert.equal(download.status, 200); assert(download.headers.get('content-disposition').includes('.ovpn'));
+  assert.equal((await fetch('http://127.0.0.1:8080/panel.js', { headers: auth })).status, 200);
+} finally { server.kill(); }
+console.log('PASS: issue, inventory, duplicates, inline profile, revocation/CRL, retry, authentication, CSRF and HTTP download.');

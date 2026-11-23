@@ -50,5 +50,47 @@ Configura estas variables en **Environment variables** del stack en Portainer:
 
 Sin usuario o contrasena, el panel queda bloqueado. El acceso usa autenticacion
 HTTP Basic. Para transportar las credenciales cifradas, accede mediante un proxy
-HTTPS o un tunel seguro. El panel inicial muestra el endpoint de la VPN y queda
-preparado para integrar la gestion de certificados.
+HTTPS o un tunel seguro.
+
+### Alta y gestion de Teltonika
+
+1. Introduce nombre y sede en el panel. Modelo y version de RutOS son opcionales.
+2. Pulsa **Crear certificado** y descarga el `.ovpn` desde el inventario.
+3. En el Teltonika, crea un cliente OpenVPN y selecciona **Upload config file**.
+   Importa el perfil, activa la configuracion y guarda los cambios.
+4. Prueba con Internet por conexion movil. Revisa en el router
+   `Initialization Sequence Completed` y una IP de `10.80.0.0/24`.
+   Comprueba tambien la reconexion al recuperar cobertura.
+
+El perfil incluye CA, certificado, clave privada del cliente y `tls-crypt`.
+No compartas perfiles entre routers. El endpoint predeterminado es
+`vpn.oceanvoice.es:1194/UDP`; `VPN_HOST` permite cambiar el nombre y
+`OPENVPN_PORT` define el puerto externo tanto del servidor como del perfil.
+
+El inventario muestra certificados de clientes vigentes, caducados y revocados.
+Su estado no indica si el router esta conectado. La revocacion publica una nueva
+CRL en el volumen compartido y bloquea nuevas conexiones; una sesion establecida
+puede continuar hasta renegociar o desconectarse. El boton **Republicar revocacion**
+permite reintentar si fallo la publicacion de la CRL. No se puede descargar un
+perfil caducado o revocado. Para sustituirlo, crea otro certificado.
+
+El panel ejecuta Easy-RSA con acceso a la CA: solo debe estar accesible para
+administradores. No monta el socket Docker ni requiere modo privilegiado.
+`routers.json`, dentro de `oceanvoice-openvpn-pki`, conserva los datos de sede y
+equipo. El panel no inicializa ni sustituye la CA existente. Las operaciones de
+PKI se serializan mediante `.panel-pki-lock`; no ejecutes Easy-RSA manualmente
+mientras el panel este realizando una operacion. Si el proceso termina durante
+una operacion, comprueba que ya no hay procesos Easy-RSA activos y revisa el
+indice antes de retirar manualmente ese directorio de bloqueo.
+
+La primera fase valida el tunel del router. El acceso a las LAN de las sedes
+requiere despues rutas, forwarding y reglas de firewall especificas.
+
+### Prueba de integracion aislada
+
+`panel/integration.test.mjs` se ejecuta dentro de la imagen del panel, desde
+`/app`, copiando primero ese archivo al contenedor de pruebas. Genera una CA
+desechable en `/tmp`, sin montar el volumen de produccion. Comprueba emision,
+inventario, duplicados, perfil, revocacion, rechazo con CRL, autenticacion y
+proteccion de las operaciones POST. Usa solo Docker remoto `docker36` para las
+pruebas en esta maquina. La prueba de conexion movil necesita un router real.

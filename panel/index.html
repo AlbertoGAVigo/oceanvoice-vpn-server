@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>OceanVoice VPN · Panel de control</title>
   <link rel="stylesheet" href="/panel.css">
+  <script src="/panel.js" defer></script>
 </head>
 <body>
   <header class="top"><div class="wrap identity"><strong>OCEANVOICE</strong><span>VPN / ADMIN</span></div></header>
@@ -20,7 +21,29 @@
     </section>
     <section aria-labelledby="certificates">
       <h2 id="certificates">Certificados</h2>
-      <p>La gestión de certificados está pendiente de integración.</p>
+      <div class="content">
+        <form id="create-router">
+          <label>Nombre del router *<input name="name" required maxlength="80" placeholder="Router principal" autocomplete="off"></label>
+          <label>Sede *<input name="site" required maxlength="120" placeholder="Vigo" autocomplete="off"></label>
+          <label>Modelo (opcional)<input name="model" maxlength="80" placeholder="Teltonika RUT…"></label>
+          <label>Versión de RutOS (opcional)<input name="firmware" maxlength="80" placeholder="Si la conoces"></label>
+          <button type="submit">Crear certificado</button>
+        </form>
+        <p id="message" role="status" aria-live="polite"></p>
+        <div class="toolbar"><span id="count">Cargando inventario…</span><button id="refresh" type="button">Actualizar</button></div>
+        <div class="table-scroll"><table><thead><tr><th>Router / sede</th><th>Equipo</th><th>Estado</th><th>Caducidad</th><th>Acciones</th></tr></thead><tbody id="inventory"></tbody></table></div>
+      </div>
+    </section>
+    <section>
+      <h2>Conectar un Teltonika por red móvil</h2>
+      <ol>
+        <li>Introduce el nombre y la sede del router y pulsa Crear certificado.</li>
+        <li>Descarga su perfil .ovpn. Contiene una clave privada: guárdalo de forma segura y úsalo solo en ese router.</li>
+        <li>En Services → VPN → OpenVPN del Teltonika, crea un cliente y selecciona Upload config file. Importa el perfil y activa la conexión.</li>
+        <li>Con la salida a Internet por red móvil, comprueba en los logs del router “Initialization Sequence Completed” y una IP 10.80.0.x.</li>
+        <li>Verifica la reconexión al recuperar la cobertura. Las rutas a las LAN de las sedes se configuran por separado.</li>
+      </ol>
+      <p>El estado “Vigente” indica validez del certificado, no que el router esté conectado. Revocar impide conexiones futuras; una sesión ya establecida puede seguir hasta su renegociación o desconexión.</p>
     </section>
   </main>
 </body>
